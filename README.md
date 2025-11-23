@@ -11,7 +11,8 @@ The code is split between a small ML pipeline (for demand prediction) and a math
 - `sessions_model_train.py` – trains a model that predicts `num_appointments` for each patient.
 - `sessions_model_predict.py` – predicts appointment counts for new patients.
 - `Optimization_model.py` – Gurobi model that schedules patients given demand, capacity (`kappa`), and already-fixed assignments (`fixed_x`).
-- `run_prediction_static_optimization.py` – placeholder for wiring predictions into the optimizer.
+- `run_prediction_static_optimization.py` – full pipeline: load features, predict demand, merge fixed bookings, and solve the schedule.
+- `schedule_printer.py` – helper to print and save the optimized schedule DataFrame to CSV.
 
 ## Prerequisites
 - Python 3.10+.
@@ -62,12 +63,23 @@ Typical flow to use the optimizer:
 
 The `__main__` block in `Optimization_model.py` demonstrates a fully synthetic example; adapt it by replacing the synthetic data generation with your predicted demand and real capacities.
 
-## Putting it together end-to-end
-1) Train: `python sessions_model_train.py training_data.csv`.
-2) Predict: `python sessions_model_predict.py new_patients.csv --model_path sessions_model.joblib --id_column patient_id`.
-3) Map predictions to integers (e.g., `sigma[p] = ceil(pred)`), set capacities, and feed them into the Gurobi model along with any pre-booked sessions.
-4) Inspect the resulting schedule DataFrame or export it to downstream systems.
+## Stage 4: End-to-end pipeline (predict + optimize)
+`run_prediction_static_optimization.py` ties the steps together:
+```
+python run_prediction_static_optimization.py \
+    new_patients.csv \
+    fixed_schedule.csv \
+    --model-path sessions_model.joblib \
+    --capacity-csv capacity.csv \
+    --default-capacity 4 \
+    --horizon 20 \
+    --tau 4 \
+    --output-csv optimized_schedule.csv
+```
+- `new_patients.csv`: feature columns plus `patient_id`; target column is optional/ignored.
+- `fixed_schedule.csv`: rows with `patient_id,time_slot[,value]` to pre-lock bookings into `fixed_x`.
+- `capacity.csv` (optional): rows with `time_slot,capacity`. If omitted, `--default-capacity` is used for all slots.
+- Use `--binary` if you want strict 0/1 scheduling variables; otherwise they are continuous in [0,1].
 
 ## Notes and gaps
-- `run_prediction_static_optimization.py` is empty; use it to glue prediction output into the optimizer steps above.
 - The example in `Optimization_model.py` references `generate_data`, which is not included here; swap in your own data preparation that produces `P, d, nu, sigma_std, sigma`.

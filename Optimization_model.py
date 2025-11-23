@@ -1,16 +1,16 @@
-from generate_data import generate_patient_csv
-from generate_data import load_patients_from_csv
+import os
 import pandas as pd
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 
-# Load or define functions:
-# - create_optimization_model
-# - visualize_schedule
-# - load_patients_from_csv (defined below)
-
-import os
+# Optional demo helpers; real workflows can ignore these.
+try:  # pragma: no cover - optional dependency
+    from generate_data import generate_patient_csv  # type: ignore
+    from generate_data import load_patients_from_csv  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    generate_patient_csv = None
+    load_patients_from_csv = None
 
 def create_optimization_model(P, T, sigma, kappa, delta, alpha, beta, gamma, fixed_x, t_fixed, tau, Binary = False):
     """
@@ -99,15 +99,16 @@ def create_optimization_model(P, T, sigma, kappa, delta, alpha, beta, gamma, fix
     
     return m
 
-def visualize_schedule(model, P, T):
+def visualize_schedule(model, P, T, horizon=None):
     """
     Returns a pandas DataFrame showing the schedule matrix where each cell is 1 if
     patient p is scheduled at time t, and 0 otherwise.
     """
-    schedule = pd.DataFrame(0, index=P, columns=range(delta))
+    _horizon = horizon if horizon is not None else len(T)
+    schedule = pd.DataFrame(0, index=P, columns=range(_horizon))
 
     for p in P:
-        for t in range(delta):
+        for t in range(_horizon):
             var = model.getVarByName(f"x[{p},{t}]")
             if var and var.X > 0:
                 schedule.at[p, t] = var.X
